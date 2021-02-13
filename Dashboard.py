@@ -33,30 +33,9 @@ dividends = pd.read_csv('TESTE_1.csv')
 dividends = pre_processing_dividends_file(dividends)
 
 
-today_str = datetime.datetime.today().strftime('%Y-%m-%d')
-
 ## This codes are necessary to relate to each one of the indexes for the Central Bank API
 codes_dict = {'ipca':433, 'cdi':12} 
 
-
-
-##--------------------##--------------------##--------------------##--------------------##--------------------
-## FASE DE TESTES APENAS -- Ja pedindo as dados na base de dados
-#df_input_stocks, df_input_funds, df_input_fix = data_base_client_input_info('test')
-
-#df_final_stocks, df_final_funds, df_final_fix = data_base_client_performace_info('test')
-
-
-#possible_stocks = df_input_stocks['stock'].unique()
-#possible_funds = df_input_funds['stock'].unique()
-#possible_fix = df_final_fix['Stock'].unique()
-
-
-### Dashboard variables
-#all_options = {
-#    'Ações': possible_stocks,
-#    'Fundos Imobiliários': possible_funds,
-#    'Renda Fixa': possible_fix}
 
 ## The company's logo s loaded to be displayed in the dashboard.
 logo = 'company_logo.png'
