@@ -255,21 +255,35 @@ def calculate_fix_dataframe(start_date, finish_date, codes_dict, df_input_fix):
 
 #-----------------------#----------------------#-----------------------#----------------------
 
-def calculate_performance_fix(fix_final):
-    grouped_fix = fix_final.groupby('Stock')
+def performance_info(df_final, investment_type):
 
-    fix_last_day_list = []
-    for i in fix_final['Stock'].unique():
-        df = grouped_fix.get_group(i)
-        fix_last_day_list.append(df[df.index.isin([max(df.index)])])
-    fix_last_day = pd.concat(fix_last_day_list)
+    if investment_type != 'fix':
 
-    total_invested_value_fix = fix_last_day['Total Invested'].sum()
-    total_accumulated_value_fix = fix_last_day['Accumulated Value'].sum()
-    total_yeld_fix = ((total_accumulated_value_fix / total_invested_value_fix) - 1) * 100
-    profit_fix = total_accumulated_value_fix - total_invested_value_fix
+        df_last_day = df_final[df_final.index.isin([max(df_final.index)])]  ## Gets the last day of all stocks 
 
-    fix_dict =  {'total_invested_value':total_invested_value_fix, 'total_accumulated_value':total_accumulated_value_fix,
-                         ' total_yeld': total_yeld_fix, 'profit':profit_fix}
+        ## Calculate the required values
+        total_invested_value = df_last_day['Total Invested'].sum()
+        total_accumulated_value = df_last_day['Accumulated Value'].sum()
+        profit = total_accumulated_value - total_invested_value
+        total_yeld = ((total_accumulated_value / total_invested_value) - 1) * 100
+       
+
+    else:
+        grouped_fix = df_final.groupby('Stock')
+
+        fix_last_day_list = []
+        for i in df_final['Stock'].unique():
+            df = grouped_fix.get_group(i)
+            fix_last_day_list.append(df[df.index.isin([max(df.index)])])
+        fix_last_day = pd.concat(fix_last_day_list)
+
+        total_invested_value = fix_last_day['Total Invested'].sum()
+        total_accumulated_value = fix_last_day['Accumulated Value'].sum()
+        profit = total_accumulated_value - total_invested_value
+        total_yeld = ((total_accumulated_value / total_invested_value) - 1) * 100
+        
+
     
-    return(fix_dict)
+    
+    return({'total_invested_value':total_invested_value, 'total_accumulated_value':total_accumulated_value,
+                     'total_yeld': total_yeld, 'profit':profit})

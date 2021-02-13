@@ -20,129 +20,93 @@ import dash_table as dt
 from generate_dataframe_functions import *
 from graph_functions_dashboard import *
 from working_with_dividends import *
-
-#### Stocks ####
-## Define stocks
-stocks = ['FESA4','KLBN4','ITSA4','EGIE3','PETR4', 'FESA4','KLBN4']
-stocks_request = [i+'.SA' for i in stocks] ## Necessary to do the request
-stocks_buy_date = ['2020-06-02', '2020-06-02', '2020-06-02', '2020-06-02', '2020-06-02', '2020-06-10', '2020-12-10']
+from data_base_connection import *
+import ast
 
 
-## Define time interval
-today_str = date.today().strftime('%Y-%m-%d')
-finish_day_str = today_str
-start_day_str = '2020-06-02'
-
-##Define invested value in each date
-purchased_value_stocks = [110, 500, 1000, 1500, 750, 1300, 800]
 
 
-## Getting input as DataFrame -- Should be imported
-df_input_stocks = pd.DataFrame({'stock':stocks, 'stock_buy_date':stocks_buy_date, 'purchased_value':purchased_value_stocks})
-
-#### Funds ####
-
-###              TEST INFORMATION         ####
-
-
-## Define stocks
-funds = ['IRDM11','HGLG11','VILG11','MXRF11', 'MGFF11', 'VILG11', 'MGFF11']
-funds_request = [i+'.SA' for i in funds] ## Necessary to do the request
-funds_buy_date = ['2020-07-02', '2020-07-02', '2020-07-02', '2020-07-02', '2020-07-02', '2020-12-10', '2020-12-10']
-
-## Define time interval
-today_str = datetime.datetime.today().strftime('%Y-%m-%d')
-finish_day_str = today_str
-start_day_str = '2020-06-02'
-
-##Define invested value in each date
-purchased_value_funds = [400, 450, 650, 850, 1500, 850, 1500]
-
-
-## Getting input as DataFrame -- Should be imported
-df_input_funds = pd.DataFrame({'stock':funds, 'stock_buy_date':funds_buy_date, 'purchased_value':purchased_value_funds})
-
-## Getting dividends
+## Getting dividends. The CSV file was created by the web scraping file
 dividends = pd.read_csv('TESTE_1.csv')
+
+## Some data processing is done in the dividends table
 dividends = pre_processing_dividends_file(dividends)
-dict_funds = define_input_dict(df_input_funds)
 
-
-####  FIXEd INCOME ###
-
-fix_base = ['ipca', 'cdi', 'ipca']
-fix_names = []
-count_ipca = 0
-count_cdi = 0
-for i in range(len(fix_base)):
-    if fix_base[i] == 'ipca':
-        count_ipca = count_ipca + 1
-        fix_names.append(fix_base[i] + ' fix ' + str(count_ipca))
-    if fix_base[i] == 'cdi':
-        count_cdi = count_cdi + 1
-        fix_names.append(fix_base[i] + ' fix ' + str(count_cdi))
-
-
-fix_buy_date = ['2020-06-01', '2020-07-02', '2020-08-01']
-fix_buy_date_API_format = [datetime.datetime.strptime(i, "%Y-%m-%d").strftime("%d/%m/%Y") for i in fix_buy_date]
 
 today_str = datetime.datetime.today().strftime('%Y-%m-%d')
 
-purchased_value_fix = [12000, 4000, 6000]
-fix_indexes = [1.2, 1.15, 1.12]
+## This codes are necessary to relate to each one of the indexes for the Central Bank API
+codes_dict = {'ipca':433, 'cdi':12} 
 
 
-df_input_fix = pd.DataFrame({'base':fix_base, 'fix_buy_date':fix_buy_date, 
-                         'fix_purchased_value':purchased_value_fix, 'fix_indexes':fix_indexes})
 
-df_input_fix.set_index('fix_buy_date', inplace = True)
+##--------------------##--------------------##--------------------##--------------------##--------------------
+## FASE DE TESTES APENAS -- Ja pedindo as dados na base de dados
+#df_input_stocks, df_input_funds, df_input_fix = data_base_client_input_info('test')
 
-start_date = min(fix_buy_date_API_format)
-finish_date = datetime.datetime.strptime(today_str, "%Y-%m-%d").strftime("%d/%m/%Y")
-codes_dict = {'ipca':433, 'cdi':12}
+#df_final_stocks, df_final_funds, df_final_fix = data_base_client_performace_info('test')
+
+
+#possible_stocks = df_input_stocks['stock'].unique()
+#possible_funds = df_input_funds['stock'].unique()
+#possible_fix = df_final_fix['Stock'].unique()
 
 
 ### Dashboard variables
+#all_options = {
+#    'Ações': possible_stocks,
+#    'Fundos Imobiliários': possible_funds,
+#    'Renda Fixa': possible_fix}
 
-all_options = {
-    'Ações': set(stocks),
-    'Fundos Imobiliários': set(funds),
-    'Renda Fixa': set(fix_names)}
-
-
+## The company's logo s loaded to be displayed in the dashboard.
 logo = 'company_logo.png'
 encoded_image_logo = base64.b64encode(open(logo, 'rb').read())
 
+## A CSS is defined
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 
+
+## Staring the DashBoard code.
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 app.layout = html.Div([
+    ## IMAGE AND TOP BANNER
     html.Div(html.Img(src='data:image/png;base64,{}'.format(encoded_image_logo.decode()),
-    style={"margin-left": "40%","height":"80"}),style={'backgroundColor':'black'}),
+    style={"height":"80"}),style={'backgroundColor':'black', "textAlign": "center"}),
 
-    html.Div(html.H3('Acompanhe o desempenho da sua carteira!', style={"margin-left": "35%","color":"orange"}), style={'backgroundColor':'black'}),
+    html.Div(html.H3('Acompanhe o desempenho da sua carteira!', style={"textAlign": "center","color":"orange"})),
     html.Hr(),
+
+    ## UPDATE INFOS BUTTON
     html.Button('Atualizar Informações', id='update-infos'),
     html.Div(id='last-update-time', style={"margin-left": "1%","color":"#1f77b4"}),
     html.Hr(),
+    html.Div(
+     dcc.Loading(
+                    id="loading",
+                    #children=[html.Div([html.Div(id="start")])],
+                    fullscreen =  False,
+                    type="cube",
+                    loading_state={'is_loading':True},
+                    #style={"margin-left": "20%"},
+                    color = "orange"
+                ), style={"textAlign": "center"}),
+
     html.Br(),
-    html.H3('A performance geral da carteira',style={"margin-left": "40%","color":"orange"}),
-    #html.Div(id='general-performance-table'),
-    #html.Br(),
-    #html.Hr(),
-    ###
+    html.H3('A performance geral da carteira',style={"textAlign": "center","color":"orange"}),
+
     html.Div([
-        ## First column -- Ploting general portfolio information on a pie chart
+        ## First column -- PLOTTING GENERAL PORTFOLIO PERFORMANCE IN THE TABLE
         html.Div([
             html.H6('Performance Geral:', style={"margin-left": "5%"}),
             html.Br(),
             html.Div(id='general-performance-table'),
             html.Hr(),
+            ##PLOTTING IMAGE WITH PROFIT IMFORMATION
             html.Img(id='portfolio-image', style={"margin-left": "20%"}),
             
             ], className="six columns"),
            
-        ## Second Column -- Ploting general portfolio information on a pie chart
+        ## Second Column -- PLOTTING GENERAL PORTFOLIO PERFORMANCE IN BAR CHART
     html.Div([
             html.H6('Distribuição Geral', style={"margin-left": "5%"}),
             dcc.Graph(id='bar_chart_geral'), 
@@ -150,28 +114,30 @@ app.layout = html.Div([
                 ], className="six columns"),
                          ], className="row"),
     ###
-
+    ## SECOND ROW OF DASHBOARD
     html.Hr(),
     html.Div(
+        ## RADIOITEM TO CHOOSE INVESTMENT TYPE (STOCKS, FUNDS, FIXED)
          dcc.RadioItems(
                 id='investment-type',
-                options=[{'label': k, 'value': k} for k in all_options.keys()], 
+                options=[{'label': k, 'value': k} for k in ['Ações', 'Fundos Imobiliários', 'Renda Fixa']], 
                 value='Ações',
                 labelStyle={'display': 'inline-block', "margin-right": "30px"},
-                style={"margin-left": "40%","color":"orange", "font-size": 25}
+                style={"textAlign": "center","color":"orange", "font-size": 25}
             ), style={'backgroundColor':'black'}),
 
     html.Hr(), 
    
+   ## THIRD ROW OF DASHBOARD
     html.Div([
-        ## First column -- Ploting general portfolio information on a pie chart
+        ## First column -- PLOTTING PIE CHART WITH CHOSEN INVESTMENT DISTRIBUTION
         html.Div([
             html.H6('Distribuição da carteira:', style={"margin-left": "5%"}),
             dcc.Graph(id='pie_chart'), 
             html.Hr(),
             ], className="six columns"),
            
-        ## Second Column -- Ploting general portfolio information on a pie chart
+        ## Second Column -- PLOTTING BAR CHART WITH CHOSEN INVESTMENT PERFORMANCE
         html.Div([
             html.H6('Performance dos Investimentos', style={"margin-left": "5%"}),
             dcc.Graph(id='bar_chart'), 
@@ -179,9 +145,10 @@ app.layout = html.Div([
                 ], className="six columns"),
                          ], className="row"),
 
-
+    ## FOURTH ROW OF DASHBOARD 
     html.Hr(),
-    html.H3('A performance de cada investimento',style={"margin-left": "35%","color":"orange"}),
+    html.H3('A performance de cada investimento',style={"textAlign": "center","color":"orange"}),
+    ## DROP DOWN TO CHOOSE STOCK/FUND/FIX VALUE
     html.Div([dcc.Dropdown(
                 id='stock-fund',
                 #options=[{'label':i, 'value':i} for i in set(stocks)],
@@ -190,23 +157,24 @@ app.layout = html.Div([
                 ]),
     html.Hr(),      
     html.Div([
-        ## First column -- Ploting general portfolio information on a pie chart
+        ## First column -- PLOTTING LINE CHART OF VALUE CHOSEN IN DROP DOWN
         html.Div([
-            #html.H6('Performance da ação', style={"margin-left": "5%"}),
-
+            
+            ## Only displayed if FIXED is chosen in Radio Item 
+            html.Div(
             dcc.RadioItems(
                 id='funds-dividends',
                 options=[{'label': k, 'value': k} for k in ['Fund','Dividend']], 
                 value='Fund',
                 labelStyle={'display': 'inline-block', "margin-right": "30px"},
                 #style={'display':'none'}
-            ),
-
+            ),style={'backgroundColor':'black', "textAlign": "center"}),
+            ## LINE CHART FOR STOCK/FUND/FIXED
             dcc.Graph(id='line_chart'),
             ], className="six columns"),
 
             
-        ## Second Column -- Ploting general portfolio information on a pie chart
+        ## Second Column -- PLOTTING STOCK/FUND/FIXED PERFORMANCE INFRMATION IN LINE CHART
         html.Div([
                 html.H6('Dados da performance da ação', style={"margin-left": "5%"}),
                 html.Div(id='stock-performance-table'),  
@@ -215,43 +183,58 @@ app.layout = html.Div([
                 ], className="six columns"),
                          ], className="row"),
 
+    ## DIVS USED TO STORE INFORMATION WHICH IS COMPUTED ONLY ONCE AND TRNAMITED AMONG THE CALLBACKS
     html.Div(id='stores-df_final_stocks', style={'display': 'none'}),
     html.Div(id='stores-df_final_funds', style={'display': 'none'}),
     html.Div(id='stores-df_dividends', style={'display': 'none'}),
     html.Div(id='stores-df_final_fix', style={'display': 'none'}),
-   
+
+    html.Div(id='stores-df_last_day_stocks', style={'display': 'none'}),
+    html.Div(id='stores-df_last_day_funds', style={'display': 'none'}),
+    html.Div(id='stores-df_last_day_fix', style={'display': 'none'}),
+
+    html.Div(id='stores-all_options', style={'display': 'none'}),   
     
     html.Hr(),
 
-], style={'backgroundColor': '#111111'})
+])
 
-
+## CALLBACK RESPONSIBLE FOR DISPLAYING FUND | DIVIDEND RADIOITEM, IF FUNDS ARE CHOSEN AS INVESTMENT TYPE
 @app.callback(
     dash.dependencies.Output('funds-dividends', 'style'),
     [dash.dependencies.Input('investment-type', 'value')])
-def define_display_funds(investment_type):
+def display_radio_item_funds(investment_type):
     if investment_type != 'Fundos Imobiliários':
         return({'display':'none'})
     else:
         return({"margin-left": "10%","color":"orange", "font-size": 15})
     
 
-
+## CALLBACK WHICH ADJUSTS DROP DOWN VALUES ACCORDING TO THE INVESTMENT TYPE CHOSEN IN THE RADIOITEM
 @app.callback(
     dash.dependencies.Output('stock-fund', 'options'),
     dash.dependencies.Output('stock-fund', 'value'),
-    [dash.dependencies.Input('investment-type', 'value')])
-def set_cities_options(investment_type):
+    [dash.dependencies.Input('investment-type', 'value')],
+    [dash.dependencies.Input('stores-all_options', 'children')])
+def set_options(investment_type, all_options):
+
+    all_options = ast.literal_eval(all_options)
+
     if investment_type == 'Ações':
-        start_value = stocks[0] 
-    if investment_type == 'Fundos Imobiliários':
-        start_value = funds[0] 
-    if investment_type == 'Renda Fixa':
-        start_value = fix_names[0] 
+        possible_stocks = all_options['Ações']
+        start_value = possible_stocks[0] 
+    elif investment_type == 'Fundos Imobiliários':
+        possible_funds = all_options['Fundos Imobiliários']
+        start_value = possible_funds[0] 
+    elif investment_type == 'Renda Fixa':
+        possible_fix = all_options['Renda Fixa']
+        start_value = possible_fix[0] 
 
     return ([{'label': i, 'value': i} for i in all_options[investment_type]], start_value)
 
-
+## CALLBACK RESPONSIBLE FOR GETTING THE HISTORICAL DATA FROM THE DATABASE, ORGANIZING THE DIVIDNDS AND COMPUTING GENERAL PERFORMANCE
+## THE INFORMATION IS PLOTED IN THE TABLE, BAR CHART AND IMAGE
+## THE DATAFRAMES GOTTEN FROM THE DATABASE ARE SAVED IN THE DIVS, SO THAT THEY CAN BE USED IN OTHER CALLBACKS
 @app.callback(
     dash.dependencies.Output('general-performance-table', 'children'),
     dash.dependencies.Output('bar_chart_geral', 'figure'),
@@ -259,79 +242,117 @@ def set_cities_options(investment_type):
     dash.dependencies.Output('stores-df_final_funds', 'children'),
     dash.dependencies.Output('stores-df_dividends', 'children'),
     dash.dependencies.Output('stores-df_final_fix', 'children'),
+    dash.dependencies.Output('stores-df_last_day_stocks', 'children'),
+    dash.dependencies.Output('stores-df_last_day_funds', 'children'),
+    dash.dependencies.Output('stores-df_last_day_fix', 'children'),
     dash.dependencies.Output('portfolio-image', 'src'),
+    dash.dependencies.Output('loading', 'children'),
+    dash.dependencies.Output('stores-all_options', 'children'),
     [dash.dependencies.Input('update-infos', 'n_clicks')])     
-def update_information_and_plot_general_table(n_clicks):
-    ## Stocks ##
-    df_final_stocks, performance_info_stocks = pipeline_and_performance_info(df_input_stocks)
+def computing(n_clicks):
+    
+    ## We get the historical information of the clients investments stored in the data base 
+    ## already done in the beginning of the app
+    df_final_stocks, df_final_funds, df_final_fix = data_base_client_performace_info('test')
+
+    df_input_stocks, df_input_funds, df_input_fix = data_base_client_input_info('test')
+
+    ## These are necessary to be shown as possible dropdown values. We create the all_options dictionary, which will be stored in a Div as
+    ## a string, and later transfrmed into a dictionary
+    possible_stocks = list(df_final_stocks['Stock'].unique())
+    possible_funds = list(df_final_funds['Stock'].unique())
+    possible_fix = list(df_final_fix['Stock'].unique())
+
+    all_options = str({'Ações': possible_stocks,'Fundos Imobiliários': possible_funds,'Renda Fixa': possible_fix})
+
+    ## We calculate the key performance indicators of each investment type
+    performance_info_stocks = performance_info(df_final_stocks, 'stocks')
+    performance_info_funds = performance_info(df_final_funds, 'funds')
+    performance_info_fix = performance_info(df_final_fix, 'fix')
  
-    ## Funds ##
-    df_final_funds, performance_info_funds = pipeline_and_performance_info(df_input_funds)
-    df_dividends = pipeline_dividends(df_final_funds, dividends, dict_funds)
+    ## It is important to remember that FUNDS have also dividends to be considered    
+    df_dividends = pipeline_dividends(df_final_funds, dividends, define_input_dict(df_input_funds))
 
-    df_final_fix = calculate_fix_dataframe(start_date, finish_date, codes_dict, df_input_fix)
+   ## It is necessary to add the dividends performance to the funds performance
+    performance_info_funds_and_dividends = performance_info_funds
+    total_accumulated_value_dividends = get_all_acumulated_dividends(df_dividends)
+    performance_info_funds_and_dividends['total_accumulated_value'] = performance_info_funds['total_accumulated_value'] + total_accumulated_value_dividends
+    performance_info_funds_and_dividends['profit'] = performance_info_funds_and_dividends['total_accumulated_value'] - performance_info_funds_and_dividends['total_invested_value']
+    performance_info_funds_and_dividends['total_yeld'] = (performance_info_funds_and_dividends['profit'] / performance_info_funds_and_dividends['total_invested_value']) * 100
 
 
-    performance_info_fix = calculate_performance_fix(df_final_fix)
 
     all_investments = pd.concat([pd.DataFrame([performance_info_stocks], index = ['stocks']), 
-                                pd.DataFrame([performance_info_funds], index = ['funds']),
+                                pd.DataFrame([performance_info_funds_and_dividends], index = ['funds']),
                                 pd.DataFrame([performance_info_fix], index = ['fix'])])
 
+
+    ## Some information of the overall performance is computed 
     invested_percentual = all_investments['total_invested_value'].apply(lambda x: x /all_investments['total_invested_value'].sum())
     profit_percentual = all_investments['profit'].apply(lambda x: x /all_investments['profit'].sum())
     
+    ## Plot bar chart of investments distributions and respective profits
     options=['Ações', 'Fundos Imobiliários', 'Renda Fixa']
-
     portfolio_dist_fig = plot_portfolio_distribution(invested_percentual, profit_percentual, options)
 
+    ## information to be displayed in general performance table 
     total_invested_value = all_investments['total_invested_value'].sum()
-    total_accumulated_value_valorization = all_investments['total_accumulated_value'].sum()
-    total_accumulated_value_dividends = get_all_acumulated_dividends(df_dividends)
-    total_accumulated_value = total_accumulated_value_valorization + total_accumulated_value_dividends
-    total_yeld = ((total_accumulated_value / total_invested_value) - 1) * 100
+    total_accumulated_value = all_investments['total_accumulated_value'].sum()
     profit = total_accumulated_value - total_invested_value
+    total_yeld = (profit / total_invested_value) * 100
 
+    ## Plot general performance table
     table_all = plot_performance_table(round(total_invested_value,2), 
                                     round(total_accumulated_value,2), 
                                     round(total_yeld,2), 
                                     round(profit,2), total_accumulated_value_dividends, 'GERAL')
 
+    ## Writing profit in displayed image
     write_profit_in_image('portfolio', round(profit,2))
     encoded_image = base64.b64encode(open('image_display_portfolio.png', 'rb').read())
+
+    ## THE LAST_DAY DATAFRAMES ARE ALSO COMPUTED, SO THAT THEY CAN BE USED IN OTHER CALLBACKS
+    df_last_day_stocks = df_final_stocks[df_final_stocks.index.isin([max(df_final_stocks.index)])]  ## Gets the last day of all stocks 
+    df_last_day_funds = df_final_funds[df_final_funds.index.isin([max(df_final_funds.index)])]  ## Gets the last day of all funds 
+
+    grouped_fix = df_final_fix.groupby('Stock')
+
+    fix_last_day_list = []
+    for i in possible_fix:  ## Gets the last day of all fix
+        df = grouped_fix.get_group(i)
+        fix_last_day_list.append(df[df.index.isin([max(df.index)])])
+    df_last_day_fix = pd.concat(fix_last_day_list)
 
     return(table_all, portfolio_dist_fig, 
             df_final_stocks.to_json(date_format='iso', orient='split'), 
             df_final_funds.to_json(date_format='iso', orient='split'),
             df_dividends.to_json(date_format='iso', orient='split'), 
             df_final_fix.to_json(date_format='iso', orient='split'),
-           'data:image/png;base64,{}'.format(encoded_image.decode()))
+            df_last_day_stocks.to_json(date_format='iso', orient='split'),
+            df_last_day_funds.to_json(date_format='iso', orient='split'),
+            df_last_day_fix.to_json(date_format='iso', orient='split'),
+           'data:image/png;base64,{}'.format(encoded_image.decode()),
+           ' ',
+           all_options)
 
 
+## CALLBACK RESPONSIBLE FOR PRINTING THE INVESTMENTS DISTRIBUTION IN A PIE CHART
 @app.callback(
     dash.dependencies.Output('pie_chart', 'figure'),
-    [dash.dependencies.Input('stores-df_final_stocks', 'children')],
-    [dash.dependencies.Input('stores-df_final_funds', 'children')],
-    [dash.dependencies.Input('stores-df_final_fix', 'children')],
+    [dash.dependencies.Input('stores-df_last_day_stocks', 'children')],
+    [dash.dependencies.Input('stores-df_last_day_funds', 'children')],
+    [dash.dependencies.Input('stores-df_last_day_fix', 'children')],
     [dash.dependencies.Input('update-infos', 'n_clicks')],
     [dash.dependencies.Input('investment-type', 'value')])   
-def print_pie_chart(df_final_stocks_json, df_final_funds_json, df_final_fix_json,  n_cliks, investment_type):
+def print_pie_chart(df_last_day_stocks_json, df_last_day_funds_json, df_last_day_fix_json,  n_cliks, investment_type):
     #if n_clicks != None:
     if investment_type == 'Ações':
-        df_final = pd.read_json(df_final_stocks_json, orient='split')
-        df_last_day = df_final[df_final.index.isin([max(df_final.index)])]  ## Gets the last day of all stocks 
+        df_last_day = pd.read_json(df_last_day_stocks_json, orient='split')
     elif investment_type == 'Fundos Imobiliários':
-        df_final = pd.read_json(df_final_funds_json, orient='split')
-        df_last_day = df_final[df_final.index.isin([max(df_final.index)])]  ## Gets the last day of all stocks 
+        df_last_day = pd.read_json(df_last_day_funds_json, orient='split')
     elif investment_type == 'Renda Fixa':
-        fix_final = pd.read_json(df_final_fix_json, orient='split')
-        grouped_fix = fix_final.groupby('Stock')
-
-        fix_last_day_list = []
-        for i in fix_final['Stock'].unique():
-            df = grouped_fix.get_group(i)
-            fix_last_day_list.append(df[df.index.isin([max(df.index)])])
-        df_last_day = pd.concat(fix_last_day_list)
+       
+        df_last_day = pd.read_json(df_last_day_fix_json, orient='split')
 
     
     fig = plot_pie_graph(df_last_day)
@@ -339,35 +360,26 @@ def print_pie_chart(df_final_stocks_json, df_final_funds_json, df_final_fix_json
     return fig
 
 
+## CALLBACK RESPONSIBLE FOR PRINTING THE INVESTMENTS DISTRIBUTION IN A BAR CHART
 @app.callback(
     dash.dependencies.Output('bar_chart', 'figure'),
     Output('last-update-time', 'children'),
-    [dash.dependencies.Input('stores-df_final_stocks', 'children')],
-    [dash.dependencies.Input('stores-df_final_funds', 'children')],
-    [dash.dependencies.Input('stores-df_final_fix', 'children')],
+    [dash.dependencies.Input('stores-df_last_day_stocks', 'children')],
+    [dash.dependencies.Input('stores-df_last_day_funds', 'children')],
+    [dash.dependencies.Input('stores-df_last_day_fix', 'children')],
     [dash.dependencies.Input('update-infos', 'n_clicks')],
      [dash.dependencies.Input('investment-type', 'value')])    
-def print_bar_chart(df_final_stocks_json, df_final_funds_json,df_final_fix_json, n_clicks, investment_type):
+def print_bar_chart(df_last_day_stocks_json, df_last_day_funds_json, df_last_day_fix_json, n_clicks, investment_type):
     #if n_clicks != None:
 
     if investment_type == 'Ações':
-        df_final = pd.read_json(df_final_stocks_json, orient='split')
-        df_last_day = df_final[df_final.index.isin([max(df_final.index)])]  ## Gets the last day of all stocks 
+        df_last_day = pd.read_json(df_last_day_stocks_json, orient='split')
 
     elif investment_type == 'Fundos Imobiliários':
-        df_final = pd.read_json(df_final_funds_json, orient='split')
-        df_last_day = df_final[df_final.index.isin([max(df_final.index)])]  ## Gets the last day of all stocks 
+        df_last_day = pd.read_json(df_last_day_funds_json, orient='split')
 
     elif investment_type == 'Renda Fixa':
-        fix_final = pd.read_json(df_final_fix_json, orient='split')
-        grouped_fix = fix_final.groupby('Stock')
-
-        fix_last_day_list = []
-        for i in fix_final['Stock'].unique():
-            df = grouped_fix.get_group(i)
-            fix_last_day_list.append(df[df.index.isin([max(df.index)])])
-        df_last_day = pd.concat(fix_last_day_list)
-
+        df_last_day = pd.read_json(df_last_day_fix_json, orient='split')
     
     fig = all_performances(df_last_day)
 
@@ -427,8 +439,7 @@ def stock_table(stock_fund, df_final_stocks_json, df_final_funds_json,df_dividen
         df_final = pd.read_json(df_final_stocks_json, orient='split')
     elif investment_type == 'Fundos Imobiliários':
         df_final = pd.read_json(df_final_funds_json, orient='split')
-        df_dividends = pd.read_json(df_dividends_json, orient='split')
-    
+        df_dividends = pd.read_json(df_dividends_json, orient='split')    
 
     elif investment_type == 'Renda Fixa':
         df_final = pd.read_json(df_final_fix_json, orient='split')
@@ -436,8 +447,7 @@ def stock_table(stock_fund, df_final_stocks_json, df_final_funds_json,df_dividen
         
     grouped_stocks = df_final.groupby('Stock')
     df_stock = grouped_stocks.get_group(stock_fund) ## Get a DataFrame only containing this stock
-    stock_last_day = df_stock.loc[max(df_stock.index)] ## Get last day of this stocl data frame
-
+    stock_last_day = df_stock.loc[max(df_stock.index)] ## Get last day of this stock data frame
 
     ## Calculate the required information
     total_invested_value_stock = stock_last_day['Total Invested']    
